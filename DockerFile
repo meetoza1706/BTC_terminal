@@ -2,8 +2,8 @@
 FROM python:3.9-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Set work directory
 WORKDIR /app
@@ -12,11 +12,11 @@ WORKDIR /app
 COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy project
+# Copy project files
 COPY . /app/
 
-# Expose port 8000
-EXPOSE 8000
+# Expose the port provided by the environment
+EXPOSE $PORT
 
-# Run the app using Waitress
-CMD ["waitress-serve", "--listen=0.0.0.0:8000", "app:app"]
+# Run the app using Waitress, binding to the provided PORT
+CMD ["sh", "-c", "waitress-serve --listen=0.0.0.0:$PORT app:app"]
