@@ -1,10 +1,11 @@
 {
     "version": 2,
     "builds": [
-      {
-        "src": "live_BTC.py",
-        "use": "@vercel/python"
-      }
+        {
+            "version": 2,
+            "builds": [{ "src": "Live_btc.py", "use": "@vercel/python" }],
+            "routes": [{ "src": "/(.*)", "dest": "Live_btc.py" }]
+          }   
     ],
     "routes": [
       {
