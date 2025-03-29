@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Live BTC chart with historical data, prediction, real-time updates, and price alerts" />
+  <title>BTC Terminal</title>
+  <!-- Load Chart.js and its date adapter -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <!-- Load standard TradingView script -->
+  <script defer src="https://s3.tradingview.com/tv.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #f5f5f5;
+      --text-color: #333333;
+      --accent-color: #00bcd4;
+      --border-color: #ddd;
+      --bg-secondary: #ffffff;
+      --gradient-start: #f0f0f0;
+      --gradient-end: #e0e0e0;
+    }
+    .dark-mode {
+      --bg-color: #121212;
+      --text-color: #e0e0e0;
+      --accent-color: #03dac6;
+      --border-color: #444;
+      --bg-secondary: #1e1e1e;
+      --gradient-start: #1a1a1a;
+      --gradient-end: #2a2a2a;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      font-family: 'Roboto', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+      overflow-x: hidden;
+    }
+    /* Widget container */
+    .widget {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.875rem;
+      font-weight: 500;
+    }
+    #clock {
+      font-size: 1.25rem;
+    }
+    .mode-toggle {
+      width: 40px;
+      height: 40px;
+      background-color: var(--accent-color);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #fff;
+      transition: transform 0.3s;
+    }
+    .mode-toggle:hover { transform: scale(1.1); }
+    /* Animated background */
+    .animated-bg {
+      position: relative;
+      overflow: hidden;
+    }
+    .animated-bg::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 100%;
+      background: linear-gradient(to right, var(--gradient-start), var(--gradient-end), var(--gradient-start));
+      animation: gradientShift 30s linear infinite;
+      z-index: -1;
+    }
+    @keyframes gradientShift {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    /* Live Chart Section */
+    .live-chart {
+      width: 100%;
+      height: 80vh;
+      position: relative;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    /* TradingView container */
+    #tradingview_wrapper {
+      width: 100%;
+      height: 100%;
+    }
+    #tradingview_chart {
+      width: 100%;
+      height: 100%;
+    }
+    .loading .spinner {
+      border: 4px solid rgba(0,0,0,0.1);
+      border-left-color: var(--accent-color);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    /* Historical Section */
+    .historical-section {
+      display: grid;
+      gap: 20px;
+    }
+    .historical-section h2 {
+      grid-column: 1 / -1;
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+    .prediction-box {
+      background-color: var(--bg-secondary);
+      padding: 20px;
+      border-radius: 8px;
+    }
+    #prediction {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    #confidence, #predictedPrice, #currentAlert {
+      font-size: 1.125rem;
+    }
+    #loadingMessage {
+      text-align: center;
+      font-size: 1.125rem;
+      color: var(--accent-color);
+    }
+    #histChartContainer {
+      background-color: var(--bg-secondary);
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 100%;
+      height: 400px;
+      opacity: 0;
+      transition: opacity 0.5s ease-in;
+    }
+    #histChartContainer.loaded { opacity: 1; }
+    /* Alert forms */
+    .alert-form {
+      margin-top: 20px;
+      padding: 20px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+    }
+    .alert-form input[type="number"] {
+      width: 48%;
+      padding: 10px;
+      margin: 10px 1%;
+      font-size: 1rem;
+    }
+    .alert-form button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: var(--accent-color);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .alert-form button:hover {
+      background-color: #0097a7;
+    }
+    .alert-form.single input[type="number"] {
+      width: 98%;
+      margin: 10px 1%;
+    }
+    @media (max-width: 768px) {
+      #histChartContainer { height: 300px; }
+      header h1 { font-size: 1.5rem; }
+      .mode-toggle { width: 35px; height: 35px; font-size: 18px; }
+      .alert-form input[type="number"] { width: 100%; margin: 10px 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BTC Terminal</h1>
+    <div id="clock"></div>
+    <button class="mode-toggle" id="modeToggle" aria-label="Toggle Dark Mode">
+      <span id="modeIcon">☀️</span>
+    </button>
+  </header>
+
+  <div class="widget animated-bg">
+    <!-- Live Chart Section -->
+    <section class="live-chart loading">
+      <div class="spinner"></div>
+      <div id="tradingview_wrapper">
+        <div id="tradingview_chart"></div>
+      </div>
+    </section>
+
+    <!-- Historical Data, Prediction & Alert Section -->
+    <section class="historical-section">
+      <h2>Historical BTC/USD Data (Last 24 Hours)</h2>
+      <div class="prediction-box">
+        <div id="prediction" aria-live="polite"></div>
+        <div id="confidence"></div>
+        <div id="predictedPrice"></div>
+        <div id="currentAlert"></div>
+      </div>
+      <div id="loadingMessage">Loading historical data...</div>
+      <div id="histChartContainer">
+        <canvas id="histChart"></canvas>
+      </div>
+      <!-- Alert Range Form -->
+      <div class="alert-form">
+        <h3>Set Alert Range</h3>
+        <form action="/set_alert" method="POST">
+          <input type="number" name="lower" placeholder="Enter lower value (84000-84500)" step="0.01" required />
+          <input type="number" name="upper" placeholder="Enter upper value (84000-84500)" step="0.01" required />
+          <button type="submit">Set Alert Range</button>
+        </form>
+      </div>
+      <!-- Single Alert Form -->
+      <div class="alert-form single">
+        <h3>Set Single Alert</h3>
+        <form action="/set_alert_single" method="POST">
+          <input type="number" name="price" placeholder="Enter target price" step="0.01" required />
+          <button type="submit">Set Single Alert</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Theme persistence
+      let currentTheme = localStorage.getItem('theme') || 'light';
+      if (currentTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('modeIcon').textContent = '🌙';
+      }
+      const modeToggle = document.getElementById('modeToggle');
+      const modeIcon = document.getElementById('modeIcon');
+      modeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+        modeIcon.textContent = currentTheme === 'dark' ? '🌙' : '☀️';
+        localStorage.setItem('theme', currentTheme);
+        loadTradingViewWidget(currentTheme);
+        updateChartTheme();
+      });
+
+      // Live clock update
+      function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB');
+      }
+      setInterval(updateClock, 1000);
+      updateClock();
+
+      // Load TradingView widget using standard tv.js
+      function loadTradingViewWidget(theme) {
+        const tvContainer = document.getElementById("tradingview_chart");
+        tvContainer.innerHTML = ""; // Clear previous widget if any
+        try {
+          if (window.TradingView) {
+            new TradingView.widget({
+              "container_id": "tradingview_chart",
+              "width": "100%",
+              "height": "100%",
+              "symbol": "BINANCE:BTCUSDT",
+              "interval": "1",
+              "timezone": "Etc/UTC",
+              "theme": theme,
+              "style": "1",
+              "locale": "en",
+              "hide_side_toolbar": false,
+              "allow_symbol_change": true,
+              "save_image": false
+            });
+            setTimeout(() => {
+              document.querySelector('.live-chart').classList.remove('loading');
+            }, 3000);
+          } else {
+            console.error("TradingView is not defined");
+          }
+        } catch (error) {
+          console.error("Error loading TradingView widget:", error);
+        }
+      }
+
+      // Update Chart.js theme if chart exists
+      function updateChartTheme() {
+        if (window.histChart) {
+          const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim();
+          const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim();
+          window.histChart.data.datasets[0].borderColor = accentColor;
+          window.histChart.options.scales.x.ticks.color = textColor;
+          window.histChart.options.scales.x.title.color = textColor;
+          window.histChart.options.scales.y.ticks.color = textColor;
+          window.histChart.options.scales.y.title.color = textColor;
+          window.histChart.options.plugins.legend.labels.color = textColor;
+          window.histChart.update();
+        }
+      }
+
+      loadTradingViewWidget(currentTheme);
+
+      // Function to fetch historical data, prediction, and alert info via AJAX
+      function fetchDataAndUpdate() {
+        fetch('/api/historical')
+          .then(res => res.json())
+          .then(data => {
+            // Update prediction, confidence, and alert info
+            document.getElementById('prediction').innerHTML = `<h2>Prediction: ${data.prediction}</h2>`;
+            document.getElementById('confidence').innerHTML = `<h3>Confidence: ${data.confidence}</h3>`;
+            document.getElementById('currentAlert').innerHTML = `<h3>Range Alert: ${data.target_price} | Single Alert: ${data.single_alert}</h3>`;
+            // Calculate predicted price based on last known price (15-min candle)
+            const times = data.history.map(d => new Date(d.time));
+            const prices = data.history.map(d => d.price);
+            if (prices.length > 0) {
+              const lastPrice = prices[prices.length - 1];
+              let predictedPrice = data.prediction.includes("↑") ? lastPrice * 1.005 : lastPrice * 0.995;
+              document.getElementById('predictedPrice').innerHTML = `<h3>Predicted Price: $${predictedPrice.toFixed(2)}</h3>`;
+            }
+            document.getElementById('loadingMessage').style.display = 'none';
+
+            const textColor = getComputedStyle(document.body).getPropertyValue('--text-color').trim();
+            const accentColor = getComputedStyle(document.body).getPropertyValue('--accent-color').trim();
+            const canvas = document.getElementById("histChart");
+
+            // Create or update chart instance as a line chart
+            if (!window.histChart || !window.histChart.data) {
+              window.histChart = new Chart(canvas, {
+                type: "line",
+                data: {
+                  labels: times,
+                  datasets: [{
+                    label: "BTC Price (USD)",
+                    data: prices,
+                    borderColor: accentColor,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.1,
+                    fill: false
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: {
+                      type: 'time',
+                      time: {
+                        tooltipFormat: 'yyyy-MM-dd HH:mm',
+                        displayFormats: { hour: 'HH:mm' }
+                      },
+                      title: {
+                        display: true,
+                        text: 'Time (24H)',
+                        color: textColor
+                      },
+                      ticks: { color: textColor }
+                    },
+                    y: {
+                      title: {
+                        display: true,
+                        text: 'Price (USD)',
+                        color: textColor
+                      },
+                      ticks: { color: textColor }
+                    }
+                  },
+                  plugins: {
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          const dateObj = new Date(context.parsed.x);
+                          return `${dateObj.toLocaleDateString('en-GB')} ${dateObj.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} - $${context.parsed.y.toFixed(2)}`;
+                        }
+                      }
+                    },
+                    legend: {
+                      display: true,
+                      position: 'top',
+                      labels: { color: textColor }
+                    }
+                  }
+                }
+              });
+            } else {
+              window.histChart.data.labels = times;
+              window.histChart.data.datasets[0].data = prices;
+              window.histChart.update();
+            }
+            document.getElementById('histChartContainer').classList.add('loaded');
+          })
+          .catch(error => {
+            console.error("Error fetching data:", error);
+            document.getElementById('loadingMessage').textContent = "Error loading data.";
+          });
+      }
+
+      // Initial fetch/update and then refresh every minute
+      fetchDataAndUpdate();
+      setInterval(fetchDataAndUpdate, 60000);
+    });
+  </script>
+</body>
+</html>
