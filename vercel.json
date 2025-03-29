@@ -3,9 +3,9 @@
     "builds": [
         {
             "version": 2,
-            "builds": [{ "src": "Live_btc.py", "use": "@vercel/python" }],
-            "routes": [{ "src": "/(.*)", "dest": "Live_btc.py" }]
-          }   
+            "builds": [{ "src": "app.py", "use": "@vercel/python" }],
+            "routes": [{ "src": "/(.*)", "dest": "app.py" }]
+          }    
     ],
     "routes": [
       {
