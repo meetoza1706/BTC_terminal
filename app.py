@@ -198,4 +198,6 @@ def set_alert_single():
         return render_template("index2.html", alert_success=False, alert_message="❌ Something went wrong. Try again.")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=8000)
+
